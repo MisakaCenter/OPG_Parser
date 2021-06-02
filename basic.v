@@ -83,8 +83,16 @@ Fixpoint find_NT (target: grammar): list string :=
                             if negb (In_string l s) then s::l else l
     end.
 
+Fixpoint delete_multi_occur_str (l: list string): list string :=
+    match l with
+    | nil => nil
+    | x::xs => if (In_string xs x)
+                    then delete_multi_occur_str xs 
+                    else x::(delete_multi_occur_str xs)
+    end.
+
 (* x not in find_NT iff. x is T *)
-Definition find_T (target: grammar): list string := filter (fun x => negb (In_string (find_NT target) x)) (find_string_in_grammar target).
+Definition find_T (target: grammar): list string := delete_multi_occur_str (filter (fun x => negb (In_string (find_NT target) x)) (find_string_in_grammar target)).
 
 (*
 Compute (find_NT test). (* = ["E"; "T"; "F"] : list string *)
@@ -101,13 +109,19 @@ Fixpoint reify_expr (nt: list string)(t: expr): expr:=
     | combine a b => combine (reify_expr nt a) (reify_expr nt b)
     end.
 
-Fixpoint _reify (nt: list string)(target: grammar): grammar:=
+Fixpoint _reify (nt: list string)(target: grammar): grammar :=
     match target with
     | nil => nil
     | (s, expr)::xs => (reify_symbol nt s, reify_expr nt expr)::(_reify nt xs)
     end.
 
-Definition reify t:= _reify (find_NT t) t.
+Definition add_EOF (g: grammar): grammar := 
+    match g with
+    | (s, e)::xs => (s, combine e (base [T "$" ; s ; T "$"]))::xs
+    | nil => nil
+    end.
+
+Definition reify t:= add_EOF (_reify (find_NT t) t).
 
 Definition test_reify := reify test.
 
@@ -189,11 +203,23 @@ Fixpoint delete_multi_occur (l: list symbol): list symbol :=
                     else x::(delete_multi_occur xs)
     end.
 
+Definition is_EOF (s: symbol): bool :=
+    match s with
+    | T s' => eqb s' "$" 
+    | _ => false
+    end.
+
+Fixpoint reify_EOF (l: list string): list string :=
+    match l with
+    | nil => nil
+    | x::xs => if eqb x "$" then reify_EOF xs else x::(reify_EOF xs)
+    end.
+
 (* the first element is all NT symbols, their first set is following in order *)
 Definition firstvt (g: grammar) := 
 let nt := find_NT g in    
     let l := map (fun s => map get_string_from_symbol (delete_multi_occur (find_first (NT s) g))) nt in
-        (nt :: l).
+        (nt :: map reify_EOF l).
 
 (* reverse the grammar, then use firstvt() to define lastvt() *)
 Fixpoint rev_expr (e: expr): expr :=
@@ -292,7 +318,7 @@ Fixpoint equal_list_eval (m: matrix)(l: list symbol)(g: grammar): matrix :=
                             if (andb (is_NT snd) (is_T trd)) (* aQb *)
                                 then (let (a, b):= (find_x_in_g_symbol g x, find_x_in_g_symbol g trd) in 
                                         equal_list_eval (change_n_m_to_x m a b eq) xs g)
-                                else if is_T snd 
+                                else if is_T snd (* ab *)
                                         then (let (a, b):= (find_x_in_g_symbol g x, find_x_in_g_symbol g snd) in 
                                                 equal_list_eval (change_n_m_to_x m a b eq) xs g)
                                         else equal_list_eval m xs g)
@@ -406,3 +432,7 @@ Compute find_T test_reify.
 Compute get_opg_matrix test_reify.
 
 End OPG_Matrix.
+
+Section OPG_Analyzer.
+
+End OPG_Analyzer.
