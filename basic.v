@@ -128,7 +128,7 @@ Section Tyck.
 (* TODO *)
 End Tyck.
 
-Section First.
+Section FIRSTVT_and_LASTVT.
 
 Fixpoint get_expr (target: symbol)(g: grammar): option expr :=
     match g with
@@ -136,7 +136,13 @@ Fixpoint get_expr (target: symbol)(g: grammar): option expr :=
     | (x, e)::xs => if (symbol_dec x target) then Some e else get_expr target xs
     end.
 
-Definition default := NT "ERROR".
+Definition default := U "ERROR".
+
+Definition look_ahead (l: list symbol): list symbol:=
+    match (nth_default default l 1) with
+    | T x => [T x]
+    | _ => nil (* default is 'U "ERROR"', which is in this clause *)
+    end.
 
 Fixpoint find_first_ (target: symbol)(g: grammar)(dec: nat): list symbol :=
     match dec with
@@ -153,15 +159,11 @@ with _find_first (target: symbol)(g: grammar)(e: expr)(dec: nat):=
         match e with
         | base l => let fst:= (nth_default default l 0) in 
                         if (symbol_dec fst target) 
-                            then (
-                                match (nth_default default l 1) with
-                                | T x => [T x]
-                                | _ => nil
-                                end
-                            ) else (
+                            then look_ahead l
+                            else (
                                 match fst with
-                                | T x => [T x]
-                                | NT _ => (find_first_ fst g n)
+                                | T x => [T x] ++ look_ahead l
+                                | NT _ => (find_first_ fst g n) ++ look_ahead l
                                 | U _ => nil
                                 end
                             )
@@ -170,7 +172,44 @@ with _find_first (target: symbol)(g: grammar)(e: expr)(dec: nat):=
     | O => nil
     end.
 
-Definition find_first (target: symbol)(g: grammar) := find_first_ target g 20.
+(* max execution depth: 100 *)
+(* because the depth maybe infinite... *)
+(* to pass the Gallina's recursion check *)
+Definition MAX_EXECUTION_DEPTH := 100.
 
-Compute map get_string_from_symbol (find_first (NT "E") test_reify).
+Definition find_first (target: symbol)(g: grammar) := find_first_ target g MAX_EXECUTION_DEPTH.
+
+Fixpoint delete_multi_occur (l: list symbol): list symbol :=
+    match l with
+    | nil => nil
+    | x::xs => if (In_symbol x xs)
+                    then delete_multi_occur xs 
+                    else x::(delete_multi_occur xs)
+    end.
+
+(* the first element is all NT symbols, their first set is following in order *)
+Definition firstvt (g: grammar) := 
+let nt := find_NT g in    
+    let l := map (fun s => map get_string_from_symbol (delete_multi_occur (find_first (NT s) g))) nt in
+        (nt :: l).
+
+(* reverse the grammar, then use firstvt() to define lastvt() *)
+Fixpoint rev_expr (e: expr): expr :=
+    match e with
+    | base l => base (rev l)
+    | combine a b => combine (rev_expr a) (rev_expr b)
+    end.
+
+Definition lastvt (g: grammar):= 
+    let rev_g:= map (fun x => (fst x, rev_expr (snd x))) g in
+        firstvt rev_g.
+
+Compute (firstvt test_reify).
+(* = [["E"; "T"; "F"]; ["+"; "*"; "("; "i"]; ["*"; "("; "i"]; ["("; "i"]]
+: list (list string) *)
+Compute (lastvt test_reify).
+(* = [["E"; "T"; "F"]; ["+"; "*"; ")"; "i"]; ["*"; ")"; "i"]; [")"; "i"]]
+: list (list string) *)
+
+End FIRSTVT_and_LASTVT.
 
