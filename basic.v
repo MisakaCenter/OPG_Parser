@@ -17,6 +17,7 @@ Inductive expr: Type :=
 
 Definition rule: Type := symbol * expr.
 Definition grammar: Type:= list rule.
+Definition EOF: symbol:= T "$".
 
 End Grammar.
 
@@ -83,6 +84,12 @@ Fixpoint find_NT (target: grammar): list string :=
                             if negb (In_string l s) then s::l else l
     end.
 
+Fixpoint reify_EOF (l: list string): list string :=
+    match l with
+    | nil => nil
+    | x::xs => if eqb x "$" then reify_EOF xs else x::(reify_EOF xs)
+    end.
+
 Fixpoint delete_multi_occur_str (l: list string): list string :=
     match l with
     | nil => nil
@@ -92,7 +99,10 @@ Fixpoint delete_multi_occur_str (l: list string): list string :=
     end.
 
 (* x not in find_NT iff. x is T *)
-Definition find_T (target: grammar): list string := delete_multi_occur_str (filter (fun x => negb (In_string (find_NT target) x)) (find_string_in_grammar target)).
+Definition find_T (target: grammar): list string := 
+    (reify_EOF
+        (delete_multi_occur_str 
+            (filter (fun x => negb (In_string (find_NT target) x)) (find_string_in_grammar target))))++["$"].
 
 (*
 Compute (find_NT test). (* = ["E"; "T"; "F"] : list string *)
@@ -117,7 +127,7 @@ Fixpoint _reify (nt: list string)(target: grammar): grammar :=
 
 Definition add_EOF (g: grammar): grammar := 
     match g with
-    | (s, e)::xs => (s, combine e (base [T "$" ; s ; T "$"]))::xs
+    | (s, e)::xs => (s, combine e (base [EOF ; s ; EOF]))::xs
     | nil => nil
     end.
 
@@ -207,12 +217,6 @@ Definition is_EOF (s: symbol): bool :=
     match s with
     | T s' => eqb s' "$" 
     | _ => false
-    end.
-
-Fixpoint reify_EOF (l: list string): list string :=
-    match l with
-    | nil => nil
-    | x::xs => if eqb x "$" then reify_EOF xs else x::(reify_EOF xs)
     end.
 
 (* the first element is all NT symbols, their first set is following in order *)
@@ -427,12 +431,23 @@ Fixpoint merge (m1 m2: matrix): matrix :=
 
 Definition get_opg_matrix (g: grammar) := merge (merge (less_eval g) (equal_eval g)) (greater_eval g).
 
-Compute test_reify.
+(* Compute test_reify.
 Compute find_T test_reify.
-Compute get_opg_matrix test_reify.
+Compute get_opg_matrix test_reify. *)
 
 End OPG_Matrix.
 
+(* G => reify G => get_opg_matrix (reify G) *)
+(* Interface *)
 Section OPG_Analyzer.
-
+Definition output_t (g: grammar):= find_T (reify g).
+Definition output_nt (g: grammar):= find_NT (reify g).
+Definition output_matrix (g: grammar):= get_opg_matrix (reify g).
 End OPG_Analyzer.
+
+(* Extraction to Haskell for I/O *)
+Require Coq.extraction.Extraction.
+Extraction Language Haskell.
+Require Coq.extraction.ExtrHaskellString.
+Require Import ExtrHaskellBasic.
+Extraction "OPG_core.hs" output_t output_nt output_matrix test.
