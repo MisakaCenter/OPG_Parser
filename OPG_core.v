@@ -18,6 +18,7 @@ Inductive expr: Type :=
 Definition rule: Type := symbol * expr.
 Definition grammar: Type:= list rule.
 Definition EOF: symbol:= T "$".
+Definition default := U "ERROR".
 
 End Grammar.
 
@@ -152,6 +153,33 @@ End Reify.
 (* Check the grammar *)
 Section Tyck.
 (* TODO *)
+
+Fixpoint check_expr (nt: list symbol)(l: list symbol): bool :=
+    match l with
+    | nil => true
+    | x::xs => if In_symbol x nt then 
+                    if In_symbol (nth_default default xs 0) nt then false else check_expr nt xs
+                else check_expr nt xs
+    end.
+
+Fixpoint check_expr_l (nt: list symbol)(e: expr): bool :=
+    match e with
+    | base l => check_expr nt l
+    | combine a b => andb (check_expr_l nt a) (check_expr_l nt b)
+    end. 
+
+Fixpoint _type_checker (nt: list symbol)(g: grammar): bool :=
+    match g with
+    | nil => true
+    | (_, e)::xs => andb (check_expr_l nt e) (_type_checker nt xs)
+    end.
+
+(* Check the grammar *)
+
+(* G -> ... Q P ... is not accepted *)
+Definition type_checker (g: grammar): bool :=
+    _type_checker (map NT (find_NT g)) g.
+
 End Tyck.
 
 Section FIRSTVT_and_LASTVT.
@@ -161,8 +189,6 @@ Fixpoint get_expr (target: symbol)(g: grammar): option expr :=
     | nil => None
     | (x, e)::xs => if (symbol_dec x target) then Some e else get_expr target xs
     end.
-
-Definition default := U "ERROR".
 
 Definition look_ahead (l: list symbol): list symbol:=
     match (nth_default default l 1) with
@@ -450,4 +476,4 @@ Require Coq.extraction.Extraction.
 Extraction Language Haskell.
 Require Coq.extraction.ExtrHaskellString.
 Require Import ExtrHaskellBasic.
-Extraction "./Module/OPG_core.hs" output_t output_nt output_matrix test.
+Extraction "./Module/OPG_core.hs" output_t output_nt output_matrix test type_checker.

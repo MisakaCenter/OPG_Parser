@@ -10,6 +10,8 @@ import Module.OPG_core
     Relation (..),
     output_matrix,
     output_t,
+    reify,
+    type_checker,
   )
 import System.Directory (doesFileExist)
 import System.IO (hFlush, stdout)
@@ -60,19 +62,30 @@ output :: Grammar -> IO ()
 output g = do
   let matrix = output_matrix g
   let t = output_t g
+  let acc = type_checker (reify g)
   let check = checkResult matrix
-  when check $ do
+  when (check && acc) $ do
     outputHeadLine (" " : t)
     printf "\n"
     outputResult (t, matrix)
-  unless check (errorMessage $ Text.pack "Grammar is not acceptable. Please input Operator Precedence Grammar!")
+  unless acc (errorMessage $ Text.pack "Grammar is not acceptable(1). Please input Operator Precedence Grammar!")
+  unless check (errorMessage $ Text.pack "Grammar is not acceptable(2). Please input Operator Precedence Grammar!")
 
 main :: IO ()
 main = do
   printf (formatWith [yellowBg, magenta, bold] "Input the grammar file: ")
   hFlush stdout
   path <- getLine
-  unless (path == ":q") $ do
+  when (path == "test") $ do
+    infoMessage $ Text.pack "Test 1: accepted grammar"
+    output (unwrap (parseOPGfile (unsafePerformIO (readLines "./Test/in1.txt"))))
+    infoMessage $ Text.pack "Test 2: Unaccepted grammar (Error 2)"
+    output (unwrap (parseOPGfile (unsafePerformIO (readLines "./Test/in2.txt"))))
+    infoMessage $ Text.pack "Test 3: Unaccepted grammar (Error 1)"
+    output (unwrap (parseOPGfile (unsafePerformIO (readLines "./Test/in3.txt"))))
+    successMessage $ Text.pack "All tests passed."
+    main
+  unless (path == ":q" || path == "test") $ do
     when (unsafePerformIO (doesFileExist path)) $ do
       let grammar_raw = unsafePerformIO (readLines path)
       let grammar = parseOPGfile grammar_raw
