@@ -1,4 +1,4 @@
-module OPG_core where
+module Module.OPG_core where
 
 import qualified Prelude
 

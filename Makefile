@@ -1,5 +1,5 @@
 all:
-	ghc -O2 --make Main.hs
+	stack ghc -- -O2 Main.hs
 clean:
 	rm -rf *.hi
 	rm -rf *.exe
