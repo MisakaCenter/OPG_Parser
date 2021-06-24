@@ -402,7 +402,7 @@ Fixpoint fold_ge (g: grammar)(l: list string)(m: matrix)(right: nat): matrix :=
                     fold_ge g xs (change_n_m_to_x m a right ge) right
     end.
 
-(* find => Qa => firstvt(Q) > a*)
+(* find => Qa => lastvt(Q) > a*)
 Fixpoint greater_list_eval (m: matrix)(l: list symbol)(g: grammar): matrix :=
     match l with
     | nil => m
